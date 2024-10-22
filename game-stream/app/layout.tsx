@@ -32,6 +32,7 @@ export default function RootLayout({
             forcedTheme="dark"
             storageKey="gamestream-theme"
           >
+            
             {children}
           </ThemeProvider>
         </body>
