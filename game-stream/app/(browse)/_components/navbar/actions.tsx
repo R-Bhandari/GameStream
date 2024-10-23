@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Clapperboard } from "lucide-react";
 
-import { SignInButton, UserButton, currentUser } from "@clerk/nextjs";
+import { SignInButton, UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import { currentUser } from "@clerk/nextjs/server";
 
 export const Actions = async () => {
   const user = await currentUser();
@@ -33,7 +34,7 @@ export const Actions = async () => {
                     </Link>
                 </Button>
                 <UserButton 
-                    afterSignOutUrl="/" 
+                    afterSwitchSessionUrl="/" 
                 />
             </div>
         )}
