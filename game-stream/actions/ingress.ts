@@ -1,0 +1,205 @@
+"use server";
+
+import { 
+    IngressAudioEncodingPreset,
+    IngressInput,
+    IngressClient,
+    IngressVideoEncodingPreset,
+    RoomServiceClient,
+    //TrackSource,
+    type CreateIngressOptions,
+    IngressVideoOptions,
+    IngressAudioOptions,
+} from "livekit-server-sdk";
+
+import { TrackSource } from "livekit-server-sdk/dist/proto/livekit_models";
+
+import { db } from "@/lib/db";
+import { getSelf } from "@/lib/auth-service";
+import { revalidatePath } from "next/cache";
+
+const roomService = new RoomServiceClient(
+    process.env.LIVEKIT_API_URL!,
+    process.env.LIVEKIT_API_KEY!,
+    process.env.LIVEKIT_API_SECRET!,
+);
+
+const ingressClient = new IngressClient(process.env.LIVEKIT_API_URL!);
+
+export const resetIngresses = async (hostIdentity: string) => {
+    const ingresses = await ingressClient.listIngress({
+        roomName: hostIdentity,
+    });
+
+    const rooms = await roomService.listRooms([hostIdentity]);
+
+    for (const room of rooms) {
+        await roomService.deleteRoom(room.name);
+    }
+
+    for (const ingress of ingresses) {
+        if (ingress.ingressId) {
+            await ingressClient.deleteIngress(ingress.ingressId);
+        }
+    }
+};
+
+export const createIngress = async (ingressType: IngressInput) => {
+    const self = await getSelf();
+
+    await resetIngresses(self.id);
+
+    const options: CreateIngressOptions = {
+        name: self.username,
+        roomName: self.id,
+        participantName: self.username,
+        participantIdentity: self.id,
+    };
+
+    // enableTranscoding is version 2 instead of bypassTranscoding in version 1
+    //used the version 1 of livekit -> npm i livekit-server-sdk@^1
+
+    if (ingressType === IngressInput.WHIP_INPUT) {
+        options.bypassTranscoding = true;
+    } else {
+        options.video =  {
+            source: TrackSource.CAMERA,
+            preset: IngressVideoEncodingPreset.H264_1080P_30FPS_3_LAYERS,
+            }; 
+        options.audio = {
+            source: TrackSource.MICROPHONE,
+            preset: IngressAudioEncodingPreset.OPUS_STEREO_96KBPS,
+            };
+        };
+    
+
+    const ingress = await ingressClient.createIngress(
+        ingressType,
+        options,
+    );
+
+    if (!ingress || !ingress.url || !ingress.streamKey) {
+        throw new Error("Failed to create ingress");
+    }
+
+    await db.stream.update({
+        where: { userId: self.id },
+        data: {
+            ingressId: ingress.ingressId,
+            serverUrl: ingress.url,
+            streamKey: ingress.streamKey,
+        },
+    });
+
+    revalidatePath(`/u/${self.username}/keys`);
+    //return ingress;
+    return JSON.stringify(ingress);
+};
+
+// used the upar wala code since its working !!
+
+
+//"use server";
+
+// import {
+//   IngressAudioEncodingPreset,
+//   IngressInput,
+//   IngressClient,
+//   IngressVideoEncodingPreset,
+//   RoomServiceClient,
+//   type CreateIngressOptions,
+//   IngressVideoOptions,
+//   IngressAudioOptions,
+//   TrackSource
+// } from "livekit-server-sdk";
+
+// //import { TrackSource } from "livekit-server-sdk/dist/proto/livekit_models_pb";
+
+// import { db } from "@/lib/db";
+// import { getSelf } from "@/lib/auth-service";
+// import { revalidatePath } from "next/cache";
+
+// const roomService = new RoomServiceClient(
+//   process.env.LIVEKIT_API_URL!,
+//   process.env.LIVEKIT_API_KEY!,
+//   process.env.LIVEKIT_API_SECRET!,
+// );
+
+// const ingressClient = new IngressClient(process.env.LIVEKIT_API_URL!);
+
+
+// export const resetIngresses = async (hostIdentity: string) => {
+//   const ingresses = await ingressClient.listIngress({
+//     roomName: hostIdentity,
+//   });
+
+//   const rooms = await roomService.listRooms([hostIdentity]);
+
+//   for (const room of rooms) {
+//     await roomService.deleteRoom(room.name);
+//   }
+
+//   for (const ingress of ingresses) {
+//     if (ingress.ingressId) {
+//       await ingressClient.deleteIngress(ingress.ingressId);
+//     }
+//   }
+// };
+
+// export const createIngress = async (ingressType: IngressInput) => {
+//   const self = await getSelf();
+
+//   await resetIngresses(self.id);
+
+  
+//   const options: CreateIngressOptions = {
+//     name: self.username,
+//     roomName: self.id,
+//     participantName: self.username,
+//     participantIdentity: self.id,
+
+//     video: new IngressVideoOptions({
+//       source: TrackSource.CAMERA,
+//       encodingOptions: {
+//         case: "preset",
+//         value: IngressVideoEncodingPreset.H264_1080P_30FPS_1_LAYER,
+//       }
+//     }),
+  
+//     audio: new IngressAudioOptions ({
+//       source: TrackSource.MICROPHONE,
+//       encodingOptions: {
+//         case: "preset",
+//         value: IngressAudioEncodingPreset.OPUS_STEREO_96KBPS,
+//       }
+//     }),
+//   };
+
+//   if (ingressType === IngressInput.WHIP_INPUT) {
+//     options.bypassTranscoding = false;
+//   }
+//   // enableTranscoding should be false
+
+//   const ingress = await ingressClient.createIngress(
+//     ingressType,
+//     options,
+//   );
+
+//   if (!ingress || !ingress.url || !ingress.streamKey) {
+//     throw new Error("Failed to create ingress");
+//   }
+
+//   await db.stream.update({
+//     where: { 
+//       userId: self.id 
+//     },
+//     data: {
+//       ingressId: ingress.ingressId,
+//       serverUrl: ingress.url,
+//       streamKey: ingress.streamKey,
+//     },
+//   });
+
+//   revalidatePath(`/u/${self.username}/keys`);
+//   return JSON.stringify(ingress);
+// };

@@ -1,3 +1,5 @@
+"use client";
+
 import qs from "query-string";
 import { useState } from "react";
 
@@ -7,9 +9,8 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export const Search = () => {
+export const Search = () => {  
     const router = useRouter();
-
     const [value, setValue] = useState("");
 
     const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -29,7 +30,7 @@ export const Search = () => {
     const onClear = () => {
         setValue("");
     };
-  };
+  
 
   return (
     <form 
